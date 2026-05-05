@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional
 import httpx
 import redis.asyncio as redis_async
 from redis.exceptions import (
-    RedisConnectionError,
+    ConnectionError,
     RedisError,
     ResponseError,
     TimeoutError,
@@ -221,7 +221,7 @@ async def redis_hgetall(
             reason="HGETALL operation timeout",
         )
 
-    except (RedisConnectionError, ConnectionError):
+    except ConnectionError:
         logger.warning(
             "Redis HGETALL connection error",
             extra={"key": key, "request_id": request_id},
@@ -315,7 +315,7 @@ async def redis_set(
             reason="SET operation timeout",
         )
 
-    except (RedisConnectionError, ConnectionError):
+    except ConnectionError:
         logger.warning(
             "Redis SET connection error",
             extra={"key": key, "request_id": request_id},
@@ -407,7 +407,7 @@ async def redis_lrange(
             reason="LRANGE operation timeout",
         )
 
-    except (RedisConnectionError, ConnectionError):
+    except ConnectionError:
         logger.warning(
             "Redis LRANGE connection error",
             extra={"key": key, "request_id": request_id},
@@ -500,7 +500,7 @@ async def redis_lua_script(
             reason="Lua script execution timeout",
         )
 
-    except (RedisConnectionError, ConnectionError):
+    except ConnectionError:
         logger.warning(
             "Redis Lua script connection error",
             extra={"request_id": request_id},
