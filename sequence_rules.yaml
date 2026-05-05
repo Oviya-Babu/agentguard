@@ -1,0 +1,14 @@
+# Sequence Rules for Tool Execution
+# Defines required execution sequences and tool dependencies
+
+# Default behavior: no sequence rules required
+sequences: []
+
+# Tool prerequisites mapping
+# Example format:
+# tool_name:
+#   prerequisites:
+#     - prerequisite_tool
+#   optional:
+#     - optional_tool
+prerequisites: {}

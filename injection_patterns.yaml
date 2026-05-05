@@ -1,0 +1,15 @@
+# Injection Pattern Detection Rules
+# Patterns for detecting injection attacks and malicious payloads
+
+patterns: []
+
+# Regex patterns to detect potential injection attacks
+# Example format:
+# - name: sql_injection
+#   regex: "(?i)(union|select|insert|update|delete)\\s+(from|into|set)"
+#   severity: high
+# - name: command_injection
+#   regex: "[;&|`$()|<>]"
+#   severity: medium
+
+rules: {}
