@@ -2,25 +2,37 @@
 
 **Mission-Critical Security Gateway for Autonomous AI Agents**
 
-AgentGuard-X is a production-grade security mesh that sits between autonomous AI agents (LangChain, CrewAI) and all tools they invoke. It intercepts, validates, and enforces security policy on every single tool execution without disrupting legitimate operations.
+AgentGuard-X is a production-grade security mesh that sits between autonomous AI agents (LangChain, CrewAI) and all tools they invoke. It intercepts, validates, and enforces security policy on every tool execution — **before it reaches the execution layer**.
 
-## What It Does
+---
 
-✓ **Intercepts** all tool calls before execution  
-✓ **Validates** agent identity, authorization, and rate limits  
-✓ **Detects** prompt injection, exfiltration sequences, and anomalies  
-✓ **Sanitizes** tool outputs by redacting PII and removing injection payloads  
-✓ **Audits** every decision with full tracing and observability  
-✓ **Protects** against LLM01, LLM06, LLM08 attacks (OWASP LLM Top 10)
+## 🔐 Core Security Principle
 
-## Architecture
+> **"Never trust agent output. Always verify intent before execution."**
+
+AgentGuard-X enforces **inline, pre-execution security validation** across the entire decision pipeline.
+
+---
+
+## 🚀 What It Does
+
+✓ **Intercepts** all tool calls before execution
+✓ **Validates** agent identity, authorization, and rate limits
+✓ **Detects** prompt injection, exfiltration sequences, and anomalies
+✓ **Sanitizes** tool outputs by redacting PII and removing injection payloads
+✓ **Audits** every decision with full tracing and observability
+✓ **Protects** against OWASP LLM Top 10 threats (LLM01, LLM06, LLM08)
+
+---
+
+## 🧠 Architecture Overview
 
 ```
 AI Agent
    ↓
 [1] Global Rate Limit (Redis Lua)
    ↓
-[2] JWT Validation (HS256, Expiry, Claims)
+[2] JWT Validation (RS256 recommended)
    ↓
 [3] Agent Registration (Redis Session)
    ↓
@@ -30,16 +42,18 @@ AI Agent
    ↓
 [6] Sequence Analysis (Attack Patterns)
    ↓
-[7] Triage Engine (Behavioral Scoring, 50ms timeout)
+[7] Triage Engine (Behavioral Scoring)
    ↓
 DECISION: ALLOW / BLOCK / SANDBOX
    ↓
-[8] Output Sanitization (Presidio PII + Injection Scanning)
+[8] Output Sanitization (Presidio + Injection Scanning)
    ↓
 Tool Execution & Result to Agent
 ```
 
-## Quick Start
+---
+
+## ⚡ Quick Start
 
 ### 1. Install Dependencies
 
@@ -47,393 +61,256 @@ Tool Execution & Result to Agent
 make setup
 ```
 
-This installs all dependencies and sets up pre-commit hooks.
-
 ### 2. Start Services
 
 ```bash
-# Start Redis, OPA, and other dependencies
-docker-compose up -d
-
-# Start the gateway (in another terminal)
+docker compose up -d
 make run
 ```
 
-### 3. Test the System
+### 3. Run Tests
 
 ```bash
-# Automated test suite (6 scenarios × automated verification)
 python scripts/test_scenarios.py
 ```
 
-Expected output:
-```
-GATEWAY HEALTH CHECK
-Status: HEALTHY
-Redis: ✓ UP
-OPA: ✓ UP
+---
 
-SCENARIO 1: Clean Request
-✓ [Scenario 1: Clean Request] PASSED - Decision: ALLOW
+## 🔎 Observability Endpoints
 
-SCENARIO 2: Prompt Injection
-✓ [Scenario 2: Prompt Injection] PASSED - Decision: BLOCK
-
-TEST SUMMARY
-✓ Passed:  4
-✗ Failed:  0
-```
-
-### 4. View Logs
+### Health Check (Public)
 
 ```bash
-# Real-time security decisions (no PII exposed)
-tail -f logs/gateway.log | grep decision
-
-# Check specific agent
-tail -f logs/gateway.log | grep "agent_001"
+curl http://localhost:8000/health
 ```
 
-## Testing Guide
+Response:
 
-### Quick Reference
+```json
+{ "status": "ok" }
+```
 
-See [QUICK_TEST_REFERENCE.md](QUICK_TEST_REFERENCE.md) for:
-- Test matrix (all 10 scenarios)
-- Command examples
-- Expected outputs
-- Success criteria
+---
 
-### Detailed Test Scenarios
-
-See [TESTING_GUIDE.md](TESTING_GUIDE.md) for:
-- Complete input/output examples (10 scenarios)
-- Step-by-step execution walkthrough
-- Trace structure and observability
-- Log output examples
-
-### Manual Testing
+### Readiness Probe (Sanitized)
 
 ```bash
-# Run individual curl tests
-bash scripts/test_manual.sh
-
-# Or use Python test suite
-python scripts/test_scenarios.py
+curl http://localhost:8000/ready
 ```
 
-## Test Scenarios
-
-| Scenario | Input | Expected Output |
-|----------|-------|-----------------|
-| **Clean Request** | Valid agent, permitted tool | `decision: ALLOW` |
-| **Prompt Injection** | Tool input with injection patterns | `decision: BLOCK` |
-| **Rate Limited** | 101st request in window | `decision: BLOCK` |
-| **Unknown Agent** | Invalid JWT | `HTTP 401` |
-| **Forbidden Tool** | Tool outside agent's role | `decision: BLOCK` (RBAC) |
-| **PII in Output** | Tool returns SSN/email/credit card | Redacted as `<ENTITY_TYPE_N>` |
-| **Exfiltration Sequence** | read_file → compress → http_post | `decision: BLOCK` (step 3) |
-| **Redis Down** | Redis unavailable | `decision: SANDBOX` |
-| **OPA Down** | Policy engine down | `decision: BLOCK` (deny-all) |
-| **Full Tracing** | Valid request with headers | Response includes `trace_id` |
-
-## Response Examples
-
-### Success (HTTP 200)
+Response:
 
 ```json
 {
-  "decision": "ALLOW",
-  "reason": "All checks passed",
-  "trace_id": "req-12345-67890"
+  "status": "ready"
 }
 ```
 
-### Blocked (HTTP 403)
+> ⚠️ Internal service details (Redis/OPA URLs, ports) are intentionally hidden.
+
+---
+
+### Security Metrics (Protected 🔐)
+
+```bash
+curl http://localhost:8000/metrics/security \
+  -H "x-api-key: <admin-key>"
+```
+
+Response (Aggregated Only):
 
 ```json
 {
-  "decision": "BLOCK",
-  "reason": "Access denied by policy",
-  "trace_id": "req-22345-67890"
+  "allowed_requests": 124,
+  "blocked_requests": 18,
+  "sandboxed_requests": 6
 }
 ```
 
-### Degraded (HTTP 200)
+> ❗ No rule names, payloads, or detection logic is exposed to prevent adversarial probing.
 
-```json
-{
-  "decision": "SANDBOX",
-  "reason": "Infrastructure degraded (redis)",
-  "trace_id": "req-33345-67890"
-}
-```
+---
 
-## Integration with LangChain/CrewAI
-
-```python
-from app.callback_handler import SecurityGatewayAsyncCallbackHandler
-
-# Create the security handler
-handler = SecurityGatewayAsyncCallbackHandler(
-    agent_id="my_agent_001",
-    jwt_token="eyJhbGciOiJIUzI1NiJ9..."
-)
-
-# Pass it to your agent
-agent = initialize_agent(
-    tools=tools,
-    callbacks=[handler],
-    ...
-)
-
-# All tool calls are now protected by AgentGuard-X
-result = agent.run("What is Python?")
-```
-
-## Security Features
+## 🛡️ Security Features
 
 ### ✓ Fail-Closed Design
-- Redis unavailable → SANDBOX (never ALLOW)
-- OPA unavailable → deny all (never allow without policy)
-- Triage timeout → SANDBOX (never default to ALLOW)
-- Any error → BLOCK (never expose agent to failures)
 
-### ✓ Atomic Operations
-- Global rate limit: Single Redis Lua call
-- Per-agent rate limit: Atomic ZADD + EXPIRE
-- Sequence analysis: WATCH+MULTI+EXEC transaction
+* Redis unavailable → SANDBOX
+* OPA unavailable → BLOCK
+* Triage timeout → SANDBOX
+* Any error → BLOCK
 
-### ✓ PII Protection
-- Presidio detects: SSN, email, phone, credit card, API key, crypto address
-- Redaction format: `<ENTITY_TYPE_N>` (no raw values ever logged)
-- Log filtering: All log lines scanned before output
+---
+
+### ✓ Identity & Access Control
+
+* JWT validation (**RS256 recommended over HS256**)
+* Agent registration via Redis session
+* RBAC enforcement via OPA
+
+---
 
 ### ✓ Attack Detection
-- **Prompt Injection**: 3-tier pattern matching (exact, regex, semantic)
-- **Excessive Agency**: RBAC + rate limits + sequence detection
-- **Data Exfiltration**: Multi-step attack pattern recognition
-- **Behavioral Anomalies**: Triage engine scoring (50ms timeout)
 
-## Monitoring & Observability
+* Prompt Injection (pattern + semantic detection)
+* Data Exfiltration (multi-step sequence analysis)
+* Excessive Agency (RBAC + rate limiting)
+* Behavioral anomalies via triage scoring
 
-### Health Checks
+---
 
-```bash
-# Gateway health
-curl http://localhost:8000/health | jq
+### ✓ Output Protection
 
-# Readiness
-curl http://localhost:8000/ready | jq
+* PII detection (Presidio)
+* Redaction format: `<ENTITY_TYPE_N>`
+* Injection payload stripping
 
-# Security metrics
-curl http://localhost:8000/metrics/security | jq
+---
+
+### ✓ Observability (Safe by Design)
+
+* Structured logs only (no raw inputs/outputs)
+* Trace IDs for debugging
+* OpenTelemetry integration (restricted access)
+
+---
+
+## 🔐 Security Hardening (IMPORTANT)
+
+### 1. JWT Security
+
+* Use **RS256 (public/private key)**
+* Rotate keys periodically
+* Never store secrets in plaintext `.env` in production
+
+---
+
+### 2. Endpoint Protection
+
+* `/metrics/security` → requires API key
+* Rate limiting applied to all endpoints
+* Sensitive endpoints should be internal-only in production
+
+---
+
+### 3. Input Defense
+
+* Input normalization (decode + canonicalize)
+* Payload size limits enforced
+* Reject malformed or oversized inputs early
+
+---
+
+### 4. Response Minimization
+
+Responses intentionally avoid detailed reasoning:
+
+```json
+{
+  "decision": "BLOCK"
+}
 ```
 
-### OpenTelemetry Tracing
+> Prevents attackers from learning policy behavior.
 
-Every request produces a complete trace visible in Grafana Tempo:
+---
 
-```
-request_pipeline (12.3ms)
-├─ step_1_global_rate_limit (0.2ms)
-├─ step_2_jwt_validation (1.1ms)
-├─ step_3_agent_session_lookup (2.3ms)
-├─ step_4_rbac_check (4.5ms)
-├─ step_5_per_agent_rate_limit (0.4ms)
-├─ step_6_sequence_analysis (0.8ms)
-├─ step_7_triage_engine (2.8ms)
-└─ output_sanitization (0.3ms)
-```
+### 5. Cross-Session Monitoring (Recommended)
 
-### Logs
+Track sequences across sessions to prevent distributed attacks.
 
-All security decisions logged with tracing support:
+---
 
-```
-2024-01-01T12:00:00.000Z [INFO] Request pipeline complete
-  agent_id: agent_001
-  tool_name: web_search
-  decision: ALLOW
-  latency_ms: 12.3
-  trace_id: 4bf92f3577b34da6a3ce929d0e0e4736
-```
+## 📊 Performance Targets
 
-**Logs never contain:**
-- Raw PII values (SSN, email, credit cards)
-- Raw JWT tokens
-- Raw tool input/output
-- Raw injection payloads
+| Metric               | Target |
+| -------------------- | ------ |
+| Gateway overhead p95 | <10ms  |
+| Full pipeline p95    | <60ms  |
+| RPS capacity         | 10,000 |
 
-Only structured, safe information is logged.
+---
 
-## Performance
+## 🧪 Test Scenarios
 
-| Metric | Target | Status |
-|--------|--------|--------|
-| Gateway overhead p95 | <10ms | ✓ |
-| Full pipeline p95 | <60ms | ✓ |
-| Triage call latency | 3-20ms | ✓ |
-| Presidio first-call | <50ms | ✓ |
-| Global RPS capacity | 10,000 | ✓ |
-| Concurrent rate limit atomicity | 50+ concurrent | ✓ |
+| Scenario            | Expected Result |
+| ------------------- | --------------- |
+| Clean request       | ALLOW           |
+| Prompt injection    | BLOCK           |
+| Forbidden tool      | BLOCK           |
+| Rate limit exceeded | BLOCK           |
+| Redis down          | SANDBOX         |
+| OPA down            | BLOCK           |
 
-## Development
+---
 
-### Code Quality
+## ⚠️ Known Limitations (Important)
 
-```bash
-make lint          # Run ruff linter
-make type-check    # Run mypy type checker
-make format        # Auto-format code
-make test-coverage # Run all tests with coverage
-```
+AgentGuard-X is designed for strong enforcement, but:
 
-### Testing
+* Pattern-based detection can be bypassed by advanced prompt obfuscation
+* Cross-session attack correlation is limited (future enhancement)
+* PII detection depends on model accuracy (not perfect)
+* Behavioral scoring depends on triage engine latency
+* Metrics endpoints must remain protected to prevent feedback attacks
 
-```bash
-# Phase 2 validation tests (6 scenarios × 10 runs each)
-make test
+---
 
-# Specific test file
-pytest tests/test_phase2_gateway_validation.py -v
+## 🔮 Future Enhancements
 
-# With coverage report
-make test-coverage
-```
+* LLM-based semantic intent verification
+* Cross-agent behavioral graph analysis
+* Zero-trust agent identity scoring
+* Adaptive policy learning engine
+* Adversarial prompt simulation testing
 
-### Pre-commit Hooks
+---
 
-Hooks automatically run on every commit:
-
-```bash
-ruff check .          # Linting
-mypy . --strict       # Type checking
-pytest tests/         # Tests
-```
-
-## Configuration
-
-All configuration via environment variables in `.env`:
-
-```bash
-# Required
-JWT_SECRET_KEY=your-secret-key-here
-REDIS_URL=redis://localhost:6379
-OPA_URL=http://localhost:8181
-TRIAGE_ENGINE_URL=https://localhost:9000
-
-# Optional
-LOG_LEVEL=INFO
-OTEL_EXPORTER_ENDPOINT=https://otlp.example.com/v1/traces
-```
-
-## Project Structure
+## 🧱 Project Structure
 
 ```
 agentguard/
 ├── app/
-│   ├── main.py                      # FastAPI application
-│   ├── pipeline.py                  # 7-step validation pipeline
-│   ├── callback_handler.py           # LangChain integration
-│   ├── output_sanitizer.py           # PII redaction + injection scanning
-│   ├── exceptions.py                 # Exception hierarchy
-│   ├── triage_client.py              # Triage engine integration
-│   ├── settings.py                   # Configuration
-│   └── observability/
-│       └── otel_setup.py             # OpenTelemetry setup
 ├── tests/
-│   └── test_phase2_gateway_validation.py  # Core validation tests
 ├── scripts/
-│   ├── test_scenarios.py             # Automated test runner
-│   ├── test_manual.sh                # Manual curl tests
-│   └── quick_test.sh                 # Quick start testing
-├── .env                              # Configuration
-├── Makefile                          # Automation
-├── .pre-commit-config.yaml           # Code quality gates
-├── QUICK_TEST_REFERENCE.md           # Quick testing guide
-├── TESTING_GUIDE.md                  # Detailed test scenarios
-└── README.md                         # This file
+├── policies/
+├── logs/
+└── README.md
 ```
-
-## Key Files
-
-### Core Implementation
-- [app/main.py](app/main.py) - FastAPI application with lifespan management
-- [app/pipeline.py](app/pipeline.py) - Complete 7-step validation pipeline
-- [app/callback_handler.py](app/callback_handler.py) - LangChain/CrewAI integration
-- [app/output_sanitizer.py](app/output_sanitizer.py) - PII redaction + injection scanning
-
-### Configuration & Testing
-- [.env](.env) - Environment variables
-- [Makefile](Makefile) - Automation targets
-- [.pre-commit-config.yaml](.pre-commit-config.yaml) - Code quality gates
-- [QUICK_TEST_REFERENCE.md](QUICK_TEST_REFERENCE.md) - Quick testing guide
-- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Detailed test scenarios
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| `connection refused` | Start gateway: `make run` |
-| `JWT invalid` | Regenerate token with correct secret |
-| `Agent not found` | Register agent in Redis: `redis-cli HSET session:agent_id ...` |
-| `OPA unreachable` | Start OPA: `docker-compose up -d opa` |
-| `Redis unreachable` | Start Redis: `docker-compose up -d redis` |
-| `High latency (>100ms)` | Wait for Presidio pre-loading on first request |
-
-## Success Criteria
-
-Your system is working correctly when:
-
-✓ **Clean requests get ALLOW verdict**
-```
-Valid agent + permitted tool → decision: ALLOW
-```
-
-✓ **Attacks are blocked**
-```
-Prompt injection → decision: BLOCK
-Forbidden tool → decision: BLOCK (RBAC)
-Rate limit exceeded → decision: BLOCK
-```
-
-✓ **PII is never logged**
-```
-grep "123-45-6789" logs/gateway.log  # No matches
-```
-
-✓ **Fail-closed behavior**
-```
-Redis down → decision: SANDBOX
-OPA down → decision: BLOCK (deny-all)
-```
-
-✓ **Performance acceptable**
-```
-Gateway overhead p95 < 10ms
-Full pipeline p95 < 60ms
-```
-
-## Next Steps
-
-1. **Run tests:** `python scripts/test_scenarios.py`
-2. **Check logs:** `tail -f logs/gateway.log | grep decision`
-3. **View traces:** Open Grafana and search by `trace_id`
-4. **Integrate:** Use `SecurityGatewayAsyncCallbackHandler` in your agent
-5. **Read docs:** See `TESTING_GUIDE.md` and `QUICK_TEST_REFERENCE.md`
-
-## License
-
-Proprietary - AgentGuard-X Security Mesh
-
-## Support
-
-For issues or questions, refer to:
-- [QUICK_TEST_REFERENCE.md](QUICK_TEST_REFERENCE.md) - Testing quick reference
-- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Detailed test scenarios
-- [app/main.py](app/main.py) - Source code documentation
 
 ---
 
-**AgentGuard-X protects autonomous AI agents from prompt injection, excessive agency, PII leakage, and supply chain attacks.**
+## ✅ Success Criteria
+
+✓ Clean requests → ALLOW
+✓ Malicious inputs → BLOCK
+✓ PII never logged
+✓ Fail-closed enforced
+✓ No sensitive data leakage
+
+---
+
+## 🧠 Key Insight
+
+> AgentGuard-X shifts security from **monitoring what happened**
+> to **controlling what is allowed to happen**
+
+---
+
+## 📌 License
+
+Proprietary — AgentGuard-X
+
+---
+
+## 💬 Support
+
+Refer to:
+
+* TESTING_GUIDE.md
+* QUICK_TEST_REFERENCE.md
+* Source code documentation
+
+---
+
+**AgentGuard-X — Securing AI from intent to execution.**
