@@ -373,8 +373,25 @@ async def lifespan(app: FastAPI):
         # Initialize Presidio (non-blocking via thread pool)
         await asyncio.to_thread(init_presidio)
 
+        # Initialize output sanitizer with Presidio instances
+        from app.output_sanitizer import set_presidio_instance, set_injection_scanner
+        if app_state.presidio_analyzer and app_state.presidio_anonymizer:
+            set_presidio_instance(app_state.presidio_analyzer, app_state.presidio_anonymizer)
+        else:
+            logger.warning("Presidio not initialized - output sanitization may fail")
+
         # Load configurations
         init_configs()
+
+        # Initialize injection scanner with patterns
+        if app_state.injection_patterns:
+            patterns_dict = app_state.injection_patterns.get("patterns", {})
+            if patterns_dict:
+                set_injection_scanner(patterns_dict)
+            else:
+                logger.info("No injection patterns configured (using defaults)")
+        else:
+            logger.info("No injection patterns configuration found (using defaults)")
 
         # Load OPA policies
         load_opa_policies()
